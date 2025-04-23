@@ -22,8 +22,7 @@ class Opposite(Strat):
     """What goes up must come down"""
 
     def daily_action(self, today: Day, yesterday: Day):
-        sell_tomorrow = yesterday.close > yesterday.open
-        if sell_tomorrow:
+        if yesterday.close > yesterday.open:
             # Sell if yesterday was up, must come down
             self.sellall_at_open(today)
         else:
@@ -36,8 +35,7 @@ class Opposite2(Strat):
     """Like Opposite, but only sell if today opened lower than yesterday closed"""
 
     def daily_action(self, today: Day, yesterday: Day):
-        sell_tomorrow = yesterday.close > yesterday.open
-        if sell_tomorrow:
+        if yesterday.close > yesterday.open:
             # Sell if yesterday was up and opening isn't higher
             if today.open < yesterday.close:
                 self.sellall_at_open(today)
@@ -70,7 +68,7 @@ class SellHigh2(Strat):
             self.sellall_at_close(today)
 
 
-#@run
+@run
 class DCA(Strat):
     """Dollar Cost Averaging... doesn't really work in a sumlation where the strategy assumes no outside money coming in"""
 
@@ -99,7 +97,7 @@ def try_strat(strat: type, data, trials):
         s = strat(trial)
         s.run()
         gains.append((s.annualized_gain(), (s.first_day.strftime(
-            "%b %d, %Y"), s.last_day.strftime("%b %d, %Y")), (s.last_day - s.first_day).days))
+            "%b %d, %Y"), s.last_day.strftime("%b %d, %Y")), (s.last_day - s.first_day).days, len(trial)))
 
     gains = sorted(gains, key=lambda x: x[0])
     return gains
@@ -119,6 +117,7 @@ if __name__ == "__main__":
     # ['Date', 'Open', 'High', 'Low', 'Close', 'Adj Close', 'Volume']
     # Note: pre April 1982 seems glitched (opening = 0.0) so this is only data after that
     filename = "sp500_all_daily.csv"
+    n_trials = 1000
 
     # Load data
     rows = csv.reader(open(filename, "r"))
@@ -128,7 +127,7 @@ if __name__ == "__main__":
     # Generate set of trials
     random.seed(b"diamondhandsalsothegame")
     trials = []
-    while len(trials) < 100:
+    while len(trials) < n_trials:
         start, end = tuple(
             sorted([random.randint(0, len(data)), random.randint(0, len(data))]))
         duration = end - start
@@ -140,10 +139,13 @@ if __name__ == "__main__":
     with multiprocessing.Pool(processes=num_processes) as pool:
         results = pool.starmap(try_strat, [(s, data, trials) for s in strats])
 
+    print(f"{n_trials=}")
+    pp = lambda g: f"{g[0]:7.2%} [{g[1][0]} - {g[1][1]}], {g[2]:8}, {g[3]:12}"
     for strat, gains in zip(strats, results):
-        print(strat.__name__)
-        print(f"\tmin = {gains[0]}")
-        print(f"\tq1  = {gains[len(gains) // 4]}")
-        print(f"\tmed = {gains[len(gains) // 2]}")
-        print(f"\tq3  = {gains[len(gains) * 3 // 4]}")
-        print(f"\tmax = {gains[-1]}")
+        print(f"{strat.__name__} - {strat.__doc__}")
+        print("              Gain     Trial Period                  Cal days  Trading days")
+        print(f"\tmin = {pp(gains[0])}")
+        print(f"\tq1  = {pp(gains[len(gains) // 4])}")
+        print(f"\tmed = {pp(gains[len(gains) // 2])}")
+        print(f"\tq3  = {pp(gains[len(gains) * 3 // 4])}")
+        print(f"\tmax = {pp(gains[-1])}\n")

@@ -56,7 +56,7 @@ class Strat:
 
     def annualized_gain(self):
         value = self.balance + self.data[self.last_day].close * self.shares
-        gain = (value - Strat.initial_cash)/Strat.initial_cash * 100
+        gain = (value - Strat.initial_cash)/Strat.initial_cash
         return gain * 365 / (self.last_day - self.first_day).days
 
     def __repr__(self):
