@@ -47,12 +47,12 @@ class Strat:
         self.balance = 0.0
 
     def sellall_at_open(self, today):
-        self.balance += today.open * self.shares
-        self.shares = 0
+        self.balance += self.shares * today.open
+        self.shares = 0.0
 
     def sellall_at_close(self, today):
-        self.balance += today.close * self.shares
-        self.shares = 0
+        self.balance += self.shares * today.close
+        self.shares = 0.0
 
     def annualized_gain(self):
         value = self.balance + self.data[self.last_day].close * self.shares

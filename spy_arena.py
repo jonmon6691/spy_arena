@@ -22,7 +22,7 @@ class Opposite(Strat):
     """What goes up must come down"""
 
     def daily_action(self, today: Day, yesterday: Day):
-        if yesterday.close > yesterday.open:
+        if  yesterday.open < yesterday.close:
             # Sell if yesterday was up, must come down
             self.sellall_at_open(today)
         else:
@@ -35,7 +35,7 @@ class Opposite2(Strat):
     """Like Opposite, but only sell if today opened lower than yesterday closed"""
 
     def daily_action(self, today: Day, yesterday: Day):
-        if yesterday.close > yesterday.open:
+        if  yesterday.open < yesterday.close:
             # Sell if yesterday was up and opening isn't higher
             if today.open < yesterday.close:
                 self.sellall_at_open(today)
@@ -49,10 +49,10 @@ class SellHigh(Strat):
     """Buy low, sell high"""
 
     def daily_action(self, today: Day, yesterday: Day):
-        if today.open < yesterday.close:
+        if yesterday.close > today.open:
             self.buyall_at_open(today)
 
-        if today.close > today.open:
+        if today.open < today.close:
             self.sellall_at_close(today)
 
 
@@ -61,10 +61,22 @@ class SellHigh2(Strat):
     """That sucks, lets do the opposite"""
 
     def daily_action(self, today: Day, yesterday: Day):
-        if today.open > yesterday.close:
+        if yesterday.close < today.open:
             self.buyall_at_open(today)
 
-        if today.close < today.open:
+        if today.open > today.close:
+            self.sellall_at_close(today)
+
+
+@run
+class SellHigh3(Strat):
+    """Accidentally discovered with a typo :)"""
+
+    def daily_action(self, today: Day, yesterday: Day):
+        if yesterday.close < today.open:
+            self.buyall_at_open(today)
+
+        if today.open < today.close:
             self.sellall_at_close(today)
 
 
@@ -92,12 +104,11 @@ class VolatilityAverse(Strat):
 def try_strat(strat: type, data, trials):
     """Worker thread that runs through all the trials in a given strat"""
     gains = []
-    for start, duration in trials:
-        trial = {day.date: day for day in data[start: start+duration]}
-        s = strat(trial)
+    for start, end in trials:
+        s = strat(data={day.date: day for day in data[start:end]})
         s.run()
         gains.append((s.annualized_gain(), (s.first_day.strftime(
-            "%b %d, %Y"), s.last_day.strftime("%b %d, %Y")), (s.last_day - s.first_day).days, len(trial)))
+            "%b %d, %Y"), s.last_day.strftime("%b %d, %Y")), (s.last_day - s.first_day).days, len(s.data)))
 
     gains = sorted(gains, key=lambda x: x[0])
     return gains
@@ -130,15 +141,15 @@ if __name__ == "__main__":
     while len(trials) < n_trials:
         start, end = tuple(
             sorted([random.randint(0, len(data)), random.randint(0, len(data))]))
-        duration = end - start
-        if 100 < duration < 10000:
-            trials.append((start, duration))
+        if 100 < (end - start) < 10000:
+            trials.append((start, end))
 
     # Execute trials
     num_processes = min(len(strats), os.cpu_count())
     with multiprocessing.Pool(processes=num_processes) as pool:
         results = pool.starmap(try_strat, [(s, data, trials) for s in strats])
 
+    # Print results
     print(f"{n_trials=}")
     pp = lambda g: f"{g[0]:7.2%} [{g[1][0]} - {g[1][1]}], {g[2]:8}, {g[3]:12}"
     for strat, gains in zip(strats, results):
