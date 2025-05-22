@@ -26,17 +26,16 @@ class Strat:
         self.first_day: datetime = min(data.keys())
         self.last_day: datetime = max(data.keys())
         self.data = data
+        self.value_chart = []
 
     def run(self):
-        yesterday = None
-        for i in range((self.last_day - self.first_day).days):
-            try:
-                today = self.data[self.first_day + timedelta(days=i)]
-                if yesterday is not None:
-                    self.daily_action(today, yesterday)
+        yesterday = self.first_day
+        for i in range(1, (self.last_day - self.first_day).days):
+            today = self.first_day + timedelta(days=i)
+            if today in self.data:
+                self.daily_action(self.data[today], self.data[yesterday])
+                self.value_chart.append(self.get_value(today))
                 yesterday = today
-            except KeyError:
-                pass
 
     def buyall_at_open(self, today):
         self.shares += self.balance / today.open
@@ -54,14 +53,13 @@ class Strat:
         self.balance += self.shares * today.close
         self.shares = 0.0
 
+    def get_value(self, day):
+        return self.balance + self.data[day].close * self.shares
+
     def annualized_gain(self):
-        value = self.balance + self.data[self.last_day].close * self.shares
+        value = self.get_value(self.last_day)
         gain = (value - Strat.initial_cash)/Strat.initial_cash
         return gain * 365 / (self.last_day - self.first_day).days
 
     def __repr__(self):
-        value = self.balance + self.data[self.last_day].close * self.shares
-        gain = (value - Strat.initial_cash)/Strat.initial_cash * 100
-        return f"{self.__class__.__name__}\n" +\
-            f"\t{self.balance=:.2f} {self.shares=}\n" +\
-            f"\tValue: {value:0.2f} ({self.get_gain_per_year():+0.2f}%)"
+        return f"{self.annualized_gain():7.2%} [{self.first_day.strftime('%b %d, %Y')} - {self.last_day.strftime('%b %d, %Y')}], {(self.last_day - self.first_day).days:8}, {len(self.data):12}"  
